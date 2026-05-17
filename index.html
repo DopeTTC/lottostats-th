@@ -326,10 +326,12 @@ function goTo(page) {
 }
 
 // ---- HOME ----
+let cdInterval = null;
 function renderHome() {
   document.getElementById('cdHome').textContent = countdown();
   document.getElementById('nextDrawDate').textContent = nextDrawLabel();
-  setInterval(() => { document.getElementById('cdHome').textContent = countdown(); }, 60000);
+  if (cdInterval) clearInterval(cdInterval);
+  cdInterval = setInterval(() => { document.getElementById('cdHome').textContent = countdown(); }, 60000);
 
   // Stats subtitle: real draw count + date range
   document.getElementById('homeSubtitle').textContent =
