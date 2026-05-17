@@ -86,7 +86,7 @@ function fmtDate(iso){
 // ── Load real data ──
 async function loadData(){
   try {
-    const r = await fetch('data/data.json');
+    const r = await fetch('./data/data.json');
     if(!r.ok) throw new Error('fetch failed');
     const json = await r.json();
 
