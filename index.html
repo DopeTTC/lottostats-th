@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="manifest.json" />
+  <title>LottoStat TH</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overscroll-behavior: none; }
+    .safe-top    { padding-top: max(56px, env(safe-area-inset-top, 0px) + 12px); }
+    .safe-bottom { padding-bottom: max(80px, env(safe-area-inset-bottom, 0px) + 64px); }
+    .nav-bar     { padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)); }
+    .page { display: none; }
+    .page.active { display: block; }
+    @keyframes up { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .fade-up { animation: up 0.2s ease; }
+    /* heat colors */
+    .h0{background:#1a3557;color:#7eb8f7;}
+    .h1{background:#1d4f8c;color:#bfdbfe;}
+    .h2{background:#1a6eb5;color:#e0f0ff;}
+    .h3{background:#2563eb;color:#fff;}
+    .h4{background:#ea7317;color:#fff;}
+    .h5{background:#e53e3e;color:#fff;}
+    .h6{background:#b91c1c;color:#fff;}
+    /* scrollbar hide */
+    ::-webkit-scrollbar { display: none; }
+    .toggle-on  { background:#22c55e; }
+    .toggle-off { background:#374151; }
+  </style>
+</head>
+<body class="bg-black text-white select-none">
+
+<!-- Loading screen -->
+<div id="loadingScreen" class="fixed inset-0 bg-black flex flex-col items-center justify-center z-50">
+  <div class="text-4xl mb-4">🎱</div>
+  <div class="text-white font-bold text-xl mb-2">LottoStat TH</div>
+  <div id="loadingMsg" class="text-gray-400 text-sm">กำลังโหลดข้อมูล...</div>
+  <div class="mt-4 w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+</div>
+
+<!-- App root (hidden until data loads) -->
+<div id="appRoot" class="hidden">
+
+<!-- ======================================================
+     DATA & HELPERS
+====================================================== -->
+<script>
+// ── Global state (populated by loadData) ──
+let TOTAL_DRAWS = 0;
+let sorted2 = [];   // [[num_str, count], ...] sorted desc
+let sorted3 = [];
+let draws   = [];   // raw draw history array
+let meta    = {};
+
+// ── Helpers ──
+function pct(c,t,dec=2){ return ((c/t)*100).toFixed(dec); }
+function heatLevel(c,t){
+  const p=c/t*100;
+  if(p<0.5)return 0; if(p<0.8)return 1; if(p<1.0)return 2;
+  if(p<1.3)return 3; if(p<1.6)return 4; if(p<2.0)return 5; return 6;
+}
+function nextDraw(){
+  const now=new Date(),y=now.getFullYear(),m=now.getMonth();
+  return [new Date(y,m,16),new Date(y,m+1,1)].find(d=>d>now);
+}
+function countdown(){
+  const diff=nextDraw()-new Date();
+  const d=Math.floor(diff/86400000),h=Math.floor((diff%86400000)/3600000),mn=Math.floor((diff%3600000)/60000);
+  return `${d} วัน ${h} ชั่วโมง ${mn} นาที`;
+}
+function nextDrawLabel(){
+  const d=nextDraw();
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+}
+function fmtDate(iso){
+  const [y,m,d]=iso.split('-');
+  return `${parseInt(d)}/${parseInt(m)}/${y}`;
+}
+
+// ── Load real data ──
+async function loadData(){
+  try {
+    const r = await fetch('data/data.json');
+    if(!r.ok) throw new Error('fetch failed');
+    const json = await r.json();
+
+    meta         = json.meta;
+    draws        = json.draws;
+    TOTAL_DRAWS  = meta.total_draws;
+
+    // Build sorted arrays [[key, count], ...]
+    sorted2 = Object.entries(json.stats.two_digit)
+      .map(([k,v])=>[k, v.count])
+      .sort((a,b)=>b[1]-a[1]);
+
+    sorted3 = Object.entries(json.stats.three_digit)
+      .map(([k,v])=>[k, v.count])
+      .sort((a,b)=>b[1]-a[1]);
+
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.getElementById('appRoot').classList.remove('hidden');
+    renderHome();
+  } catch(e) {
+    document.getElementById('loadingMsg').textContent =
+      'โหลดข้อมูลไม่สำเร็จ — ต้องเปิดผ่าน server (ไม่ใช่ file://)';
+    console.error(e);
+  }
+}
+</script>
+
+<!-- ======================================================
+     PAGES
+====================================================== -->
+
+<!-- ── PAGE: HOME ── -->
+<div id="page-home" class="page active fade-up safe-top safe-bottom overflow-y-auto h-screen bg-gradient-to-b from-gray-900 via-gray-950 to-black">
+
+  <!-- Header -->
+  <div class="px-5 pt-2 pb-5">
+    <div class="flex justify-between items-start">
+      <div>
+        <h1 class="text-3xl font-black tracking-tight">LottoStat TH</h1>
+        <p id="homeSubtitle" class="text-gray-400 text-sm mt-1">กำลังโหลด...</p>
+      </div>
+      <div class="text-right mt-1">
+        <div class="text-xs text-gray-500 mb-0.5">งวดถัดไป <span class="text-gray-400" id="nextDrawDate"></span></div>
+        <div class="text-sm font-bold text-yellow-400" id="cdHome"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hot 2-digit -->
+  <div class="px-5 mb-6">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-bold text-base">🔥 เลขท้าย 2 ตัว ร้อนแรง</h2>
+      <span class="text-xs text-gray-500">ฐาน 1.00%</span>
+    </div>
+    <div class="grid grid-cols-5 gap-2" id="hot2Home"></div>
+  </div>
+
+  <!-- Hot 3-digit -->
+  <div class="px-5 mb-6">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-bold text-base">🔥 เลขท้าย 3 ตัว ร้อนแรง</h2>
+      <span class="text-xs text-gray-500">ฐาน 0.10%</span>
+    </div>
+    <div class="grid grid-cols-5 gap-2" id="hot3Home"></div>
+  </div>
+
+  <!-- Cold 2-digit -->
+  <div class="px-5 mb-6">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-bold text-base">❄️ เลขท้าย 2 ตัว เย็นชา</h2>
+      <span class="text-xs text-gray-500">ไม่ออกนาน</span>
+    </div>
+    <div class="flex flex-wrap gap-2" id="cold2Home"></div>
+  </div>
+
+  <!-- Last draw -->
+  <div class="px-5 mb-4">
+    <h2 class="font-bold text-base mb-3">📋 งวดล่าสุด</h2>
+    <div class="bg-gray-800 rounded-2xl p-4 flex items-center justify-between">
+      <div class="text-sm text-gray-400" id="lastDrawDate"></div>
+      <div class="flex gap-3">
+        <div class="text-center"><div class="text-xs text-gray-500 mb-1">2 ตัว</div><div class="bg-yellow-500 text-black font-black text-xl px-3 py-1 rounded-xl" id="lastTwo"></div></div>
+        <div class="text-center"><div class="text-xs text-gray-500 mb-1">3 ตัว</div><div class="bg-orange-500 text-white font-black text-xl px-3 py-1 rounded-xl" id="lastThree"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="mx-5 mb-4 bg-gray-900 border border-gray-700 rounded-2xl p-3 text-center">
+    <p class="text-xs text-gray-500">⚠️ หวยเป็นการสุ่ม สถิติในอดีตไม่รับประกันผลในอนาคต ใช้เพื่อความบันเทิงเท่านั้น</p>
+  </div>
+</div>
+
+<!-- ── PAGE: HEATMAP ── -->
+<div id="page-map" class="page fade-up safe-top safe-bottom overflow-y-auto h-screen bg-gray-950">
+
+  <div class="px-5 pt-2 pb-3">
+    <h1 class="text-2xl font-black">LottoStat TH 🗺️</h1>
+    <p class="text-gray-500 text-xs mt-1">แตะตัวเลขเพื่อดูเปอร์เซ็นต์</p>
+  </div>
+
+  <!-- Legend -->
+  <div class="px-5 mb-3 flex items-center gap-2">
+    <span class="text-xs text-gray-500">เย็น</span>
+    <div class="flex gap-1 flex-1">
+      <div class="flex-1 h-4 rounded h0"></div>
+      <div class="flex-1 h-4 rounded h1"></div>
+      <div class="flex-1 h-4 rounded h2"></div>
+      <div class="flex-1 h-4 rounded h3"></div>
+      <div class="flex-1 h-4 rounded h4"></div>
+      <div class="flex-1 h-4 rounded h5"></div>
+      <div class="flex-1 h-4 rounded h6"></div>
+    </div>
+    <span class="text-xs text-gray-500">ร้อน</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex mx-5 mb-4 bg-gray-800 rounded-xl p-1 gap-1">
+    <button id="mapTab2" onclick="switchMapTab(2)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">เลข 2 ตัว</button>
+    <button id="mapTab3" onclick="switchMapTab(3)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">เลข 3 ตัว (Top 100)</button>
+  </div>
+
+  <!-- Grid 2 -->
+  <div id="mapGrid2" class="px-4">
+    <div class="grid grid-cols-10 gap-1.5" id="heatGrid2"></div>
+  </div>
+
+  <!-- Grid 3 -->
+  <div id="mapGrid3" class="px-4 hidden">
+    <div class="text-xs text-gray-600 mb-2 text-center">แสดง Top 100 เรียงตามความถี่</div>
+    <div class="grid grid-cols-10 gap-1.5" id="heatGrid3"></div>
+  </div>
+
+  <!-- Tooltip overlay -->
+  <div id="mapTooltip" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onclick="document.getElementById('mapTooltip').classList.add('hidden')">
+    <div class="bg-white text-black rounded-3xl p-6 text-center shadow-2xl min-w-48" onclick="event.stopPropagation()">
+      <div id="ttNum" class="text-5xl font-black mb-2"></div>
+      <div id="ttPct" class="text-2xl font-bold text-blue-600"></div>
+      <div id="ttBase" class="text-sm text-gray-500 mt-1"></div>
+      <div id="ttCount" class="text-xs text-gray-400 mt-1"></div>
+      <button onclick="document.getElementById('mapTooltip').classList.add('hidden')" class="mt-4 bg-black text-white rounded-full px-6 py-2 text-sm font-semibold">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PAGE: RANK ── -->
+<div id="page-rank" class="page fade-up safe-top safe-bottom overflow-y-auto h-screen bg-gray-950">
+
+  <div class="px-5 pt-2 pb-3 sticky top-0 bg-gray-950 z-10 border-b border-gray-800/60">
+    <h1 class="text-2xl font-black mb-3">อันดับ 🏆</h1>
+    <div class="flex bg-gray-800 rounded-xl p-1 gap-1">
+      <button id="rankTab2" onclick="switchRankTab(2)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">เลข 2 ตัว</button>
+      <button id="rankTab3" onclick="switchRankTab(3)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">เลข 3 ตัว</button>
+    </div>
+  </div>
+
+  <div id="rankList2" class="px-4 pt-3 space-y-2 pb-4"></div>
+  <div id="rankList3" class="px-4 pt-3 space-y-2 pb-4 hidden"></div>
+</div>
+
+<!-- ── PAGE: CHART ── -->
+<div id="page-chart" class="page fade-up safe-top safe-bottom overflow-y-auto h-screen bg-gray-950">
+
+  <div class="px-5 pt-2 pb-3">
+    <h1 class="text-2xl font-black">กราฟ 📊</h1>
+    <p class="text-gray-500 text-xs mt-1">ความถี่สะสมตลอด 60 ปี</p>
+  </div>
+
+  <!-- Sub-tabs -->
+  <div class="flex mx-5 mb-4 bg-gray-800 rounded-xl p-1 gap-1">
+    <button id="chartTab2" onclick="switchChartTab(2)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">2 ตัว Top 20</button>
+    <button id="chartTab3" onclick="switchChartTab(3)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">3 ตัว Top 15</button>
+  </div>
+
+  <div id="chartView2" class="px-4">
+    <div class="bg-gray-900 rounded-2xl p-4"><canvas id="chartCanvas2" height="280"></canvas></div>
+    <div class="mt-3 bg-gray-900 rounded-2xl p-3 flex justify-around text-center">
+      <div><div class="text-lg font-bold text-green-400" id="statAvg2"></div><div class="text-xs text-gray-500">ค่าเฉลี่ย</div></div>
+      <div><div class="text-lg font-bold text-red-400" id="statMax2"></div><div class="text-xs text-gray-500">สูงสุด</div></div>
+      <div><div class="text-lg font-bold text-blue-400" id="statMin2"></div><div class="text-xs text-gray-500">ต่ำสุด</div></div>
+    </div>
+  </div>
+
+  <div id="chartView3" class="px-4 hidden">
+    <div class="bg-gray-900 rounded-2xl p-4"><canvas id="chartCanvas3" height="280"></canvas></div>
+    <div class="mt-3 bg-gray-900 rounded-2xl p-3 flex justify-around text-center">
+      <div><div class="text-lg font-bold text-green-400" id="statAvg3"></div><div class="text-xs text-gray-500">ค่าเฉลี่ย</div></div>
+      <div><div class="text-lg font-bold text-red-400" id="statMax3"></div><div class="text-xs text-gray-500">สูงสุด</div></div>
+      <div><div class="text-lg font-bold text-blue-400" id="statMin3"></div><div class="text-xs text-gray-500">ต่ำสุด</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── BOTTOM NAV ── -->
+<nav class="fixed bottom-0 left-0 right-0 bg-gray-900/96 backdrop-blur-xl border-t border-gray-800 z-40 nav-bar">
+  <div class="flex justify-around pt-2 pb-2">
+    <button onclick="goTo('home')" id="nav-home" class="flex flex-col items-center gap-0.5 px-4 py-1">
+      <span class="text-2xl">🏠</span><span class="text-xs font-medium text-white">หน้าแรก</span>
+    </button>
+    <button onclick="goTo('map')" id="nav-map" class="flex flex-col items-center gap-0.5 px-4 py-1">
+      <span class="text-2xl">🗺️</span><span class="text-xs font-medium text-gray-500">แผนที่</span>
+    </button>
+    <button onclick="goTo('rank')" id="nav-rank" class="flex flex-col items-center gap-0.5 px-4 py-1">
+      <span class="text-2xl">🏆</span><span class="text-xs font-medium text-gray-500">อันดับ</span>
+    </button>
+    <button onclick="goTo('chart')" id="nav-chart" class="flex flex-col items-center gap-0.5 px-4 py-1">
+      <span class="text-2xl">📊</span><span class="text-xs font-medium text-gray-500">กราฟ</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ======================================================
+     LOGIC
+====================================================== -->
+<script>
+const PAGES = ['home','map','rank','chart'];
+let chart2 = null, chart3 = null;
+
+// ---- Navigation ----
+function goTo(page) {
+  PAGES.forEach(p => {
+    document.getElementById(`page-${p}`).classList.toggle('active', p === page);
+    document.getElementById(`page-${p}`).classList.toggle('page', true);
+    const btn = document.getElementById(`nav-${p}`);
+    btn.querySelector('span:last-child').className = `text-xs font-medium ${p === page ? 'text-white' : 'text-gray-500'}`;
+  });
+  if (page === 'map')   renderMap();
+  if (page === 'rank')  renderRank();
+  if (page === 'chart') renderCharts();
+}
+
+// ---- HOME ----
+function renderHome() {
+  document.getElementById('cdHome').textContent = countdown();
+  document.getElementById('nextDrawDate').textContent = nextDrawLabel();
+  setInterval(() => { document.getElementById('cdHome').textContent = countdown(); }, 60000);
+
+  // Stats subtitle: real draw count + date range
+  document.getElementById('homeSubtitle').textContent =
+    `สถิติ ${TOTAL_DRAWS} งวด · ${fmtDate(meta.data_from)} – ${fmtDate(meta.data_to)}`;
+
+  document.getElementById('hot2Home').innerHTML = sorted2.slice(0,5).map(([n,c]) =>
+    `<div class="bg-gray-800 active:bg-gray-700 rounded-xl p-2 text-center cursor-default">
+      <div class="text-2xl font-black">${n}</div>
+      <div class="text-xs text-green-400 font-semibold mt-0.5">${pct(c,TOTAL_DRAWS)}%</div>
+      <div class="text-xs text-gray-600 mt-0.5">${c} ครั้ง</div>
+    </div>`).join('');
+
+  document.getElementById('hot3Home').innerHTML = sorted3.slice(0,5).map(([n,c]) =>
+    `<div class="bg-gray-800 rounded-xl p-2 text-center cursor-default">
+      <div class="text-xl font-black">${n}</div>
+      <div class="text-xs text-green-400 font-semibold mt-0.5">${pct(c,TOTAL_DRAWS)}%</div>
+      <div class="text-xs text-gray-600 mt-0.5">${c} ครั้ง</div>
+    </div>`).join('');
+
+  document.getElementById('cold2Home').innerHTML = sorted2.slice(-6).reverse().map(([n,c]) =>
+    `<div class="bg-gray-800/70 rounded-xl px-3 py-2 text-center cursor-default">
+      <div class="text-base font-black text-blue-400">${n}</div>
+      <div class="text-xs text-gray-500">${pct(c,TOTAL_DRAWS)}%</div>
+    </div>`).join('');
+
+  // Real last draw
+  const last = draws[draws.length - 1];
+  document.getElementById('lastDrawDate').textContent = `งวด ${fmtDate(last.date)}`;
+  document.getElementById('lastTwo').textContent  = last.last2  || '--';
+  document.getElementById('lastThree').textContent = last.last3 || '--';
+}
+
+// ---- MAP ----
+let mapRendered = false;
+function renderMap() {
+  if (mapRendered) return;
+  mapRendered = true;
+
+  // Build lookup map for O(1) access
+  const map2 = Object.fromEntries(sorted2);
+  const grid2 = document.getElementById('heatGrid2');
+  for (let i = 0; i <= 99; i++) {
+    const k = String(i).padStart(2,'0'), c = map2[k] || 0;
+    const h = heatLevel(c, TOTAL_DRAWS);
+    const el = document.createElement('div');
+    el.className = `h${h} rounded text-center py-2.5 text-xs font-bold cursor-pointer active:opacity-70`;
+    el.textContent = k;
+    el.onclick = () => showMapTooltip(k, c, TOTAL_DRAWS, 1.0);
+    grid2.appendChild(el);
+  }
+
+  const grid3 = document.getElementById('heatGrid3');
+  sorted3.slice(0,100).forEach(([k,c]) => {
+    const h = heatLevel(c, TOTAL_DRAWS);
+    const el = document.createElement('div');
+    el.className = `h${h} rounded text-center py-2.5 text-xs font-bold cursor-pointer active:opacity-70`;
+    el.textContent = k;
+    el.onclick = () => showMapTooltip(k, c, TOTAL_DRAWS, 0.10);
+    grid3.appendChild(el);
+  });
+}
+
+function switchMapTab(n) {
+  document.getElementById('mapGrid2').classList.toggle('hidden', n !== 2);
+  document.getElementById('mapGrid3').classList.toggle('hidden', n !== 3);
+  document.getElementById('mapTab2').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===2?'bg-white text-black':'text-gray-400'}`;
+  document.getElementById('mapTab3').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===3?'bg-white text-black':'text-gray-400'}`;
+}
+
+function showMapTooltip(num, count, total, base) {
+  const p = parseFloat(pct(count, total));
+  const diff = (p - base).toFixed(2);
+  const sign = diff >= 0 ? '+' : '';
+  document.getElementById('ttNum').textContent = num;
+  document.getElementById('ttPct').textContent = p + '%';
+  document.getElementById('ttBase').textContent = `${sign}${diff}% เทียบฐาน ${base.toFixed(2)}%`;
+  document.getElementById('ttBase').className = `text-sm mt-1 font-semibold ${diff >= 0 ? 'text-green-600' : 'text-blue-600'}`;
+  document.getElementById('ttCount').textContent = `ออก ${count} ครั้ง จาก ${total} งวด`;
+  document.getElementById('mapTooltip').classList.remove('hidden');
+}
+
+// ---- RANK ----
+let rankRendered = false;
+function renderRank() {
+  if (rankRendered) return;
+  rankRendered = true;
+  const medals = ['🥇','🥈','🥉'];
+
+  document.getElementById('rankList2').innerHTML = sorted2.slice(0,30).map(([n,c],i) => {
+    const p = parseFloat(pct(c,TOTAL_DRAWS)), diff = (p-1.0).toFixed(2), bw = Math.min(100,(p/3)*100);
+    return `<div class="bg-gray-800 rounded-2xl p-3 flex items-center gap-3">
+      <div class="text-base w-7 text-center shrink-0">${medals[i] || `<span class="text-gray-500 text-sm">${i+1}</span>`}</div>
+      <div class="text-2xl font-black w-10 shrink-0">${n}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex justify-between text-xs mb-1.5">
+          <span class="font-bold text-green-400">${p}%</span>
+          <span class="${parseFloat(diff)>=0?'text-green-500':'text-blue-400'} font-medium">${parseFloat(diff)>=0?'+':''}${diff}% vs ฐาน</span>
+        </div>
+        <div class="bg-gray-700 rounded-full h-1.5">
+          <div class="h-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-red-500 transition-all" style="width:${bw}%"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('rankList3').innerHTML = sorted3.slice(0,30).map(([n,c],i) => {
+    const p = parseFloat(pct(c,TOTAL_DRAWS)), diff = (p-0.10).toFixed(3), bw = Math.min(100,(p/0.6)*100);
+    return `<div class="bg-gray-800 rounded-2xl p-3 flex items-center gap-3">
+      <div class="text-base w-7 text-center shrink-0">${medals[i] || `<span class="text-gray-500 text-sm">${i+1}</span>`}</div>
+      <div class="text-2xl font-black w-12 shrink-0">${n}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex justify-between text-xs mb-1.5">
+          <span class="font-bold text-green-400">${p}%</span>
+          <span class="${parseFloat(diff)>=0?'text-green-500':'text-blue-400'} font-medium">${parseFloat(diff)>=0?'+':''}${diff}% vs ฐาน</span>
+        </div>
+        <div class="bg-gray-700 rounded-full h-1.5">
+          <div class="h-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all" style="width:${bw}%"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function switchRankTab(n) {
+  document.getElementById('rankList2').classList.toggle('hidden', n !== 2);
+  document.getElementById('rankList3').classList.toggle('hidden', n !== 3);
+  document.getElementById('rankTab2').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===2?'bg-white text-black':'text-gray-400'}`;
+  document.getElementById('rankTab3').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===3?'bg-white text-black':'text-gray-400'}`;
+}
+
+// ---- CHARTS ----
+let chartsRendered = false;
+function renderCharts() {
+  if (chartsRendered) return;
+  chartsRendered = true;
+
+  const top20 = sorted2.slice(0,20);
+  const vals2 = top20.map(x => parseFloat(pct(x[1],TOTAL_DRAWS)));
+  chart2 = new Chart(document.getElementById('chartCanvas2').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: top20.map(x=>x[0]),
+      datasets: [{
+        data: vals2,
+        backgroundColor: vals2.map(v => v >= 2.0 ? '#b91c1c' : v >= 1.6 ? '#ef4444' : v >= 1.3 ? '#f97316' : '#3b82f6'),
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      plugins: { legend: { display:false }, tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y}%` } } },
+      scales: {
+        x: { ticks: { color:'#9ca3af', font:{size:11} }, grid: { display:false } },
+        y: { ticks: { color:'#9ca3af', font:{size:10}, callback: v=>v+'%' }, grid: { color:'#1f2937' } }
+      }
+    }
+  });
+  document.getElementById('statAvg2').textContent = (vals2.reduce((a,b)=>a+b,0)/vals2.length).toFixed(2)+'%';
+  document.getElementById('statMax2').textContent = Math.max(...vals2).toFixed(2)+'%';
+  document.getElementById('statMin2').textContent = Math.min(...vals2).toFixed(2)+'%';
+
+  const top15 = sorted3.slice(0,15);
+  const vals3 = top15.map(x => parseFloat(pct(x[1],TOTAL_DRAWS)));
+  chart3 = new Chart(document.getElementById('chartCanvas3').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: top15.map(x=>x[0]),
+      datasets: [{
+        data: vals3,
+        backgroundColor: '#f97316',
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      plugins: { legend: { display:false }, tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y}%` } } },
+      scales: {
+        x: { ticks: { color:'#9ca3af', font:{size:10} }, grid: { display:false } },
+        y: { ticks: { color:'#9ca3af', font:{size:10}, callback: v=>v+'%' }, grid: { color:'#1f2937' } }
+      }
+    }
+  });
+  document.getElementById('statAvg3').textContent = (vals3.reduce((a,b)=>a+b,0)/vals3.length).toFixed(3)+'%';
+  document.getElementById('statMax3').textContent = Math.max(...vals3).toFixed(3)+'%';
+  document.getElementById('statMin3').textContent = Math.min(...vals3).toFixed(3)+'%';
+}
+
+function switchChartTab(n) {
+  document.getElementById('chartView2').classList.toggle('hidden', n !== 2);
+  document.getElementById('chartView3').classList.toggle('hidden', n !== 3);
+  document.getElementById('chartTab2').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===2?'bg-white text-black':'text-gray-400'}`;
+  document.getElementById('chartTab3').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===3?'bg-white text-black':'text-gray-400'}`;
+}
+
+// ---- INIT ----
+loadData();
+</script>
+</div><!-- /appRoot -->
+</body>
+</html>

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>สุ่มหวย — Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
+    .heat-0 { background:#1e3a5f;color:#93c5fd; }
+    .heat-1 { background:#1e4d8c;color:#bfdbfe; }
+    .heat-2 { background:#1d6fae;color:#dbeafe; }
+    .heat-3 { background:#2563eb;color:#fff; }
+    .heat-4 { background:#f97316;color:#fff; }
+    .heat-5 { background:#ef4444;color:#fff; }
+    .heat-6 { background:#dc2626;color:#fff; }
+    .switcher-bar { position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation:fadeIn 0.18s ease; }
+    .page { display:none; }
+    .page.active { display:block; }
+  </style>
+</head>
+<body class="bg-black text-white min-h-screen">
+
+<script>
+const TOTAL_DRAWS = 1440;
+const mock2 = {};
+for (let i=0;i<=99;i++){
+  const k=String(i).padStart(2,'0');
+  const hot=[14,23,45,67,89,1,56,78,32,90];
+  const cold=[7,13,42,61,88];
+  let b=Math.floor(Math.random()*8+10);
+  if(hot.includes(i)) b+=Math.floor(Math.random()*10+8);
+  if(cold.includes(i)) b=Math.floor(Math.random()*5+3);
+  mock2[k]=b;
+}
+const mock3={};
+for(let i=0;i<=999;i++){
+  const k=String(i).padStart(3,'0');
+  let b=Math.floor(Math.random()*3+1);
+  if(Math.random()<0.05) b+=Math.floor(Math.random()*4+3);
+  mock3[k]=b;
+}
+function pct(c,t){return((c/t)*100).toFixed(2)}
+function heatLevel(c,t){
+  const p=c/t*100;
+  if(p<0.5)return 0;if(p<0.8)return 1;if(p<1.0)return 2;
+  if(p<1.3)return 3;if(p<1.6)return 4;if(p<2.0)return 5;return 6;
+}
+const sorted2=Object.entries(mock2).sort((a,b)=>b[1]-a[1]);
+const sorted3=Object.entries(mock3).sort((a,b)=>b[1]-a[1]);
+const top2=sorted2.slice(0,10);
+const top3=sorted3.slice(0,10);
+function nextDraw(){
+  const now=new Date(),y=now.getFullYear(),m=now.getMonth();
+  const d16=new Date(y,m,16),d1n=new Date(y,m+1,1);
+  return [d16,d1n].find(d=>d>now);
+}
+function countdown(){
+  const diff=nextDraw()-new Date();
+  const days=Math.floor(diff/86400000),hrs=Math.floor((diff%86400000)/3600000);
+  return`${days}วัน ${hrs}ชม.`;
+}
+</script>
+
+<!-- ===================== VARIANT A ===================== -->
+<div id="varA" class="hidden">
+
+  <!-- PAGE: Home -->
+  <div id="A-home" class="page active fade-in bg-gradient-to-b from-gray-900 to-black min-h-screen pb-28">
+    <div class="px-4 pt-14 pb-4">
+      <div class="flex justify-between items-start">
+        <div><h1 class="text-2xl font-bold">สุ่มหวย</h1><p class="text-gray-400 text-sm mt-0.5">สถิติย้อนหลัง 60 ปี</p></div>
+        <div class="text-right"><div class="text-xs text-gray-500">งวดถัดไป</div><div class="text-sm font-semibold text-yellow-400" id="cdA"></div></div>
+      </div>
+    </div>
+    <div class="px-4 mb-5">
+      <div class="flex justify-between items-center mb-3"><h2 class="text-base font-semibold">🔥 เลขท้าย 2 ตัว ร้อนแรง</h2><span class="text-xs text-gray-500">Top 5</span></div>
+      <div class="grid grid-cols-5 gap-2" id="hotCards2A"></div>
+    </div>
+    <div class="px-4 mb-5">
+      <div class="flex justify-between items-center mb-3"><h2 class="text-base font-semibold">🔥 เลขท้าย 3 ตัว ร้อนแรง</h2><span class="text-xs text-gray-500">Top 5</span></div>
+      <div class="grid grid-cols-5 gap-2" id="hotCards3A"></div>
+    </div>
+    <div class="px-4 mb-5">
+      <div class="flex justify-between items-center mb-3"><h2 class="text-base font-semibold">❄️ เลข 2 ตัว เย็นชา</h2></div>
+      <div class="flex flex-wrap gap-2" id="coldCards2A"></div>
+    </div>
+    <div class="mx-4 bg-gray-800 rounded-2xl p-4">
+      <div class="text-xs text-gray-400 mb-3">ข้อมูลสถิติ</div>
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div><div class="text-xl font-bold">1,440</div><div class="text-xs text-gray-400">งวดทั้งหมด</div></div>
+        <div><div class="text-xl font-bold">60</div><div class="text-xs text-gray-400">ปีข้อมูล</div></div>
+        <div><div class="text-xl font-bold text-green-400">Live</div><div class="text-xs text-gray-400">อัปเดตอัตโนมัติ</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: Chart -->
+  <div id="A-chart" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-1">📊 กราฟความถี่</h2>
+    <p class="text-gray-500 text-xs mb-4">Top 20 เลข 2 ตัว ที่ออกบ่อยที่สุด</p>
+    <div class="bg-gray-900 rounded-2xl p-3 mb-4"><canvas id="barChart2A" height="220"></canvas></div>
+    <p class="text-gray-500 text-xs mb-3 mt-5">Top 10 เลข 3 ตัว ที่ออกบ่อยที่สุด</p>
+    <div class="bg-gray-900 rounded-2xl p-3"><canvas id="barChart3A" height="200"></canvas></div>
+  </div>
+
+  <!-- PAGE: All -->
+  <div id="A-all" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-1">🔢 เลขทั้งหมด</h2>
+    <p class="text-gray-500 text-xs mb-4">เรียงตามความถี่ — แตะดูรายละเอียด</p>
+    <div class="flex mb-4 bg-gray-800 rounded-xl p-1 gap-1">
+      <button id="Aall2btn" onclick="switchAllA(2)" class="flex-1 py-1.5 rounded-lg text-sm font-medium bg-white text-black">2 ตัว</button>
+      <button id="Aall3btn" onclick="switchAllA(3)" class="flex-1 py-1.5 rounded-lg text-sm font-medium text-gray-400">3 ตัว</button>
+    </div>
+    <div id="Aall2list" class="space-y-1.5"></div>
+    <div id="Aall3list" class="space-y-1.5 hidden"></div>
+  </div>
+
+  <!-- PAGE: Settings -->
+  <div id="A-settings" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-5">⚙️ ตั้งค่า</h2>
+    <div class="space-y-3">
+      <div class="bg-gray-800 rounded-2xl p-4 flex justify-between items-center"><div><div class="font-medium">แจ้งเตือนงวดใหม่</div><div class="text-xs text-gray-400 mt-0.5">แจ้งเตือนก่อนวันออกรางวัล</div></div><div class="w-12 h-6 bg-green-500 rounded-full relative cursor-pointer"><div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
+      <div class="bg-gray-800 rounded-2xl p-4 flex justify-between items-center"><div><div class="font-medium">อัปเดตอัตโนมัติ</div><div class="text-xs text-gray-400 mt-0.5">ดึงข้อมูลเมื่อประกาศผล</div></div><div class="w-12 h-6 bg-green-500 rounded-full relative cursor-pointer"><div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
+      <div class="bg-gray-800 rounded-2xl p-4 flex justify-between items-center"><div><div class="font-medium">น้ำหนักความใหม่</div><div class="text-xs text-gray-400 mt-0.5">ให้น้ำหนักงวดล่าสุดมากกว่า</div></div><div class="w-12 h-6 bg-green-500 rounded-full relative cursor-pointer"><div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
+      <div class="bg-gray-800 rounded-2xl p-4"><div class="font-medium mb-2">ช่วงข้อมูล</div><div class="flex gap-2 flex-wrap">
+        <button class="px-3 py-1.5 bg-white text-black rounded-full text-sm font-medium">60 ปี</button>
+        <button class="px-3 py-1.5 bg-gray-700 rounded-full text-sm">30 ปี</button>
+        <button class="px-3 py-1.5 bg-gray-700 rounded-full text-sm">10 ปี</button>
+        <button class="px-3 py-1.5 bg-gray-700 rounded-full text-sm">5 ปี</button>
+      </div></div>
+    </div>
+    <div class="mt-6 text-center text-xs text-gray-600">⚠️ หวยเป็นเรื่องสุ่ม สถิติไม่รับประกันผล</div>
+  </div>
+
+  <!-- Nav A -->
+  <div class="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 safe-bottom z-40">
+    <div class="flex justify-around py-2 pb-16">
+      <button onclick="navA('home')" id="Anav-home" class="flex flex-col items-center py-1 text-white"><span class="text-xl">🏠</span><span class="text-xs mt-0.5">หน้าแรก</span></button>
+      <button onclick="navA('chart')" id="Anav-chart" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">📊</span><span class="text-xs mt-0.5">กราฟ</span></button>
+      <button onclick="navA('all')" id="Anav-all" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">🔢</span><span class="text-xs mt-0.5">ทั้งหมด</span></button>
+      <button onclick="navA('settings')" id="Anav-settings" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">⚙️</span><span class="text-xs mt-0.5">ตั้งค่า</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VARIANT B ===================== -->
+<div id="varB" class="hidden">
+
+  <!-- PAGE: Rank -->
+  <div id="B-rank" class="page active fade-in bg-gray-950 min-h-screen pb-28">
+    <div class="bg-gray-900 px-4 pt-14 pb-3 sticky top-0 z-10 border-b border-gray-800">
+      <div class="flex justify-between items-center mb-3">
+        <h1 class="text-xl font-bold">สุ่มหวย 🎱</h1>
+        <div class="bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full" id="cdB"></div>
+      </div>
+      <div class="flex bg-gray-800 rounded-xl p-1 gap-1">
+        <button id="tab2B" onclick="switchTabB(2)" class="flex-1 py-1.5 rounded-lg text-sm font-medium bg-white text-black">เลข 2 ตัว</button>
+        <button id="tab3B" onclick="switchTabB(3)" class="flex-1 py-1.5 rounded-lg text-sm font-medium text-gray-400">เลข 3 ตัว</button>
+      </div>
+    </div>
+    <div id="list2B" class="px-4 pt-4"><div class="text-xs text-gray-500 mb-3 flex justify-between"><span>อันดับ — เลข</span><span>โอกาส / ฐาน 1.00%</span></div><div id="rankList2B" class="space-y-2"></div></div>
+    <div id="list3B" class="px-4 pt-4 hidden"><div class="text-xs text-gray-500 mb-3 flex justify-between"><span>อันดับ — เลข</span><span>โอกาส / ฐาน 0.10%</span></div><div id="rankList3B" class="space-y-2"></div></div>
+  </div>
+
+  <!-- PAGE: Trend -->
+  <div id="B-trend" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-1">📈 แนวโน้ม</h2>
+    <p class="text-gray-500 text-xs mb-4">เปรียบเทียบ 5 ปีล่าสุด vs ทั้งหมด</p>
+    <div class="space-y-3" id="trendListB"></div>
+  </div>
+
+  <!-- PAGE: History -->
+  <div id="B-history" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-1">🕐 ประวัติการออกรางวัล</h2>
+    <p class="text-gray-500 text-xs mb-4">งวดล่าสุด (ข้อมูลจำลอง)</p>
+    <div class="space-y-2" id="historyListB"></div>
+  </div>
+
+  <!-- PAGE: About -->
+  <div id="B-about" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-5">ℹ️ เกี่ยวกับ</h2>
+    <div class="space-y-4 text-sm text-gray-300">
+      <div class="bg-gray-800 rounded-2xl p-4"><div class="font-semibold text-white mb-2">วิธีคำนวณโอกาส</div><p class="leading-relaxed">นำจำนวนครั้งที่เลขออก หารด้วยจำนวนงวดทั้งหมด แล้วคูณ 100 เพื่อแปลงเป็นเปอร์เซ็นต์</p><div class="mt-3 bg-gray-900 rounded-xl p-3 font-mono text-xs text-green-400">โอกาส = (ครั้งที่ออก ÷ งวดทั้งหมด) × 100%</div></div>
+      <div class="bg-gray-800 rounded-2xl p-4"><div class="font-semibold text-white mb-2">ฐานอ้างอิง</div><p class="leading-relaxed">เลข 2 ตัว ฐาน = 1.00% / เลข 3 ตัว ฐาน = 0.10% หากสูงกว่าฐาน = ร้อนแรง</p></div>
+      <div class="bg-red-900/40 border border-red-800 rounded-2xl p-4"><div class="font-semibold text-red-400 mb-2">⚠️ คำเตือน</div><p class="leading-relaxed text-gray-400">หวยเป็นการสุ่ม สถิติในอดีตไม่ได้รับประกันผลในอนาคต ใช้เพื่อความบันเทิงเท่านั้น</p></div>
+    </div>
+  </div>
+
+  <!-- Nav B -->
+  <div class="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 safe-bottom z-40">
+    <div class="flex justify-around py-2 pb-16">
+      <button onclick="navB('rank')" id="Bnav-rank" class="flex flex-col items-center py-1 text-white"><span class="text-xl">🏆</span><span class="text-xs mt-0.5">อันดับ</span></button>
+      <button onclick="navB('trend')" id="Bnav-trend" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">📈</span><span class="text-xs mt-0.5">แนวโน้ม</span></button>
+      <button onclick="navB('history')" id="Bnav-history" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">🕐</span><span class="text-xs mt-0.5">ประวัติ</span></button>
+      <button onclick="navB('about')" id="Bnav-about" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">ℹ️</span><span class="text-xs mt-0.5">เกี่ยวกับ</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VARIANT C ===================== -->
+<div id="varC" class="hidden">
+
+  <!-- PAGE: Heatmap -->
+  <div id="C-map" class="page active fade-in bg-gray-950 min-h-screen pb-28">
+    <div class="px-4 pt-14 pb-3">
+      <h1 class="text-xl font-bold">สุ่มหวย</h1>
+      <p class="text-gray-500 text-xs">แผนที่ความร้อน — ยิ่งแดง ยิ่งออกบ่อย</p>
+    </div>
+    <div class="px-4 mb-3 flex items-center gap-2">
+      <span class="text-xs text-gray-500">เย็น</span>
+      <div class="flex gap-1"><div class="w-5 h-5 rounded heat-0"></div><div class="w-5 h-5 rounded heat-1"></div><div class="w-5 h-5 rounded heat-2"></div><div class="w-5 h-5 rounded heat-3"></div><div class="w-5 h-5 rounded heat-4"></div><div class="w-5 h-5 rounded heat-5"></div><div class="w-5 h-5 rounded heat-6"></div></div>
+      <span class="text-xs text-gray-500">ร้อน</span>
+      <span class="ml-auto text-xs text-gray-600">แตะดู%</span>
+    </div>
+    <div class="flex mx-4 mb-3 bg-gray-800 rounded-xl p-1 gap-1">
+      <button id="tabC2" onclick="switchTabC(2)" class="flex-1 py-1.5 rounded-lg text-sm font-medium bg-white text-black">เลข 2 ตัว</button>
+      <button id="tabC3" onclick="switchTabC(3)" class="flex-1 py-1.5 rounded-lg text-sm font-medium text-gray-400">เลข 3 ตัว (Top 100)</button>
+    </div>
+    <div id="grid2C" class="px-3"><div class="grid grid-cols-10 gap-1" id="heatGrid2"></div></div>
+    <div id="grid3C" class="px-3 hidden"><div class="grid grid-cols-10 gap-1" id="heatGrid3"></div></div>
+    <div id="tooltipC" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-black rounded-2xl p-4 text-center shadow-2xl z-50 min-w-32">
+      <div id="tooltipNum" class="text-3xl font-bold"></div>
+      <div id="tooltipPct" class="text-lg font-semibold text-blue-600 mt-1"></div>
+      <div id="tooltipCount" class="text-xs text-gray-500 mt-1"></div>
+      <div class="text-xs text-gray-400 mt-2">แตะที่อื่นเพื่อปิด</div>
+    </div>
+  </div>
+
+  <!-- PAGE: Rank -->
+  <div id="C-rank" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-1">🏆 อันดับ Top 20</h2>
+    <div class="flex mb-4 bg-gray-800 rounded-xl p-1 gap-1">
+      <button id="Crank2btn" onclick="switchRankC(2)" class="flex-1 py-1.5 rounded-lg text-sm font-medium bg-white text-black">2 ตัว</button>
+      <button id="Crank3btn" onclick="switchRankC(3)" class="flex-1 py-1.5 rounded-lg text-sm font-medium text-gray-400">3 ตัว</button>
+    </div>
+    <div id="Crank2list" class="space-y-1.5"></div>
+    <div id="Crank3list" class="space-y-1.5 hidden"></div>
+  </div>
+
+  <!-- PAGE: Chart -->
+  <div id="C-chart" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-4">📊 กราฟ Top 15</h2>
+    <div class="bg-gray-900 rounded-2xl p-3"><canvas id="barChartC" height="260"></canvas></div>
+  </div>
+
+  <!-- PAGE: Settings -->
+  <div id="C-settings" class="page fade-in bg-gray-950 min-h-screen pb-28 px-4 pt-14">
+    <h2 class="text-xl font-bold mb-5">⚙️ ตั้งค่า</h2>
+    <div class="space-y-3">
+      <div class="bg-gray-800 rounded-2xl p-4 flex justify-between items-center"><div><div class="font-medium">แจ้งเตือนงวดใหม่</div><div class="text-xs text-gray-400 mt-0.5">แจ้งเตือนก่อนวันออกรางวัล</div></div><div class="w-12 h-6 bg-green-500 rounded-full relative cursor-pointer"><div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
+      <div class="bg-gray-800 rounded-2xl p-4"><div class="font-medium mb-2">สีของแผนที่</div><div class="flex gap-2">
+        <button class="px-3 py-1.5 bg-white text-black rounded-full text-sm font-medium">น้ำเงิน→แดง</button>
+        <button class="px-3 py-1.5 bg-gray-700 rounded-full text-sm">เขียว→แดง</button>
+        <button class="px-3 py-1.5 bg-gray-700 rounded-full text-sm">เทา→ทอง</button>
+      </div></div>
+      <div class="bg-gray-800 rounded-2xl p-4"><div class="font-medium mb-2">ช่วงข้อมูล</div><div class="flex gap-2 flex-wrap">
+        <button class="px-3 py-1.5 bg-white text-black rounded-full text-sm font-medium">60 ปี</button>
+        <button class="px-3 py-1.5 bg-gray-700 rounded-full text-sm">30 ปี</button>
+        <button class="px-3 py-1.5 bg-gray-700 rounded-full text-sm">10 ปี</button>
+      </div></div>
+    </div>
+    <div class="mt-6 text-center text-xs text-gray-600">⚠️ หวยเป็นเรื่องสุ่ม สถิติไม่รับประกันผล</div>
+  </div>
+
+  <!-- Nav C -->
+  <div class="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 safe-bottom z-40">
+    <div class="flex justify-around py-2 pb-16">
+      <button onclick="navC('map')" id="Cnav-map" class="flex flex-col items-center py-1 text-white"><span class="text-xl">🗺️</span><span class="text-xs mt-0.5">แผนที่</span></button>
+      <button onclick="navC('rank')" id="Cnav-rank" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">🏆</span><span class="text-xs mt-0.5">อันดับ</span></button>
+      <button onclick="navC('chart')" id="Cnav-chart" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">📊</span><span class="text-xs mt-0.5">กราฟ</span></button>
+      <button onclick="navC('settings')" id="Cnav-settings" class="flex flex-col items-center py-1 text-gray-500"><span class="text-xl">⚙️</span><span class="text-xs mt-0.5">ตั้งค่า</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PROTOTYPE SWITCHER ===== -->
+<div class="switcher-bar">
+  <div class="flex items-center bg-gray-900 border border-gray-700 rounded-full px-3 py-2 shadow-2xl gap-3 text-sm">
+    <button onclick="prevVariant()" class="text-white font-bold px-2 py-1 hover:text-yellow-400 transition-colors">◀</button>
+    <span class="text-gray-300 font-mono text-xs min-w-32 text-center" id="varLabel"></span>
+    <button onclick="nextVariant()" class="text-white font-bold px-2 py-1 hover:text-yellow-400 transition-colors">▶</button>
+  </div>
+</div>
+
+<script>
+// ---- NAV helpers ----
+function setNav(prefix, active, keys){
+  keys.forEach(k=>{
+    const btn=document.getElementById(`${prefix}nav-${k}`);
+    if(btn) btn.className=`flex flex-col items-center py-1 ${k===active?'text-white':'text-gray-500'}`;
+  });
+}
+function showPage(prefix, page, keys){
+  keys.forEach(k=>{
+    const el=document.getElementById(`${prefix}-${k}`);
+    if(el){el.classList.remove('active');el.classList.add('page');}
+  });
+  const target=document.getElementById(`${prefix}-${page}`);
+  if(target){target.classList.add('active');target.classList.remove('hidden');}
+}
+
+// ---- NAV A ----
+const navAkeys=['home','chart','all','settings'];
+let chartA2=null,chartA3=null;
+function navA(page){
+  showPage('A',page,navAkeys);
+  setNav('A',page,navAkeys);
+  if(page==='chart') renderChartsA();
+}
+function switchAllA(n){
+  document.getElementById('Aall2list').classList.toggle('hidden',n!==2);
+  document.getElementById('Aall3list').classList.toggle('hidden',n!==3);
+  document.getElementById('Aall2btn').className=`flex-1 py-1.5 rounded-lg text-sm font-medium ${n===2?'bg-white text-black':'bg-gray-700 text-gray-400'}`;
+  document.getElementById('Aall3btn').className=`flex-1 py-1.5 rounded-lg text-sm font-medium ${n===3?'bg-white text-black':'bg-gray-700 text-gray-400'}`;
+}
+function renderChartsA(){
+  if(chartA2){chartA2.destroy();chartA2=null;}
+  if(chartA3){chartA3.destroy();chartA3=null;}
+  const top20_2=sorted2.slice(0,20);
+  const ctx2=document.getElementById('barChart2A').getContext('2d');
+  chartA2=new Chart(ctx2,{type:'bar',data:{labels:top20_2.map(x=>x[0]),datasets:[{data:top20_2.map(x=>parseFloat(pct(x[1],TOTAL_DRAWS))),backgroundColor:top20_2.map(x=>heatLevel(x[1],TOTAL_DRAWS)>=4?'#ef4444':'#3b82f6'),borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9ca3af',font:{size:10}}},y:{ticks:{color:'#9ca3af',font:{size:10}},grid:{color:'#374151'}}}}});
+  const top10_3=sorted3.slice(0,10);
+  const ctx3=document.getElementById('barChart3A').getContext('2d');
+  chartA3=new Chart(ctx3,{type:'bar',data:{labels:top10_3.map(x=>x[0]),datasets:[{data:top10_3.map(x=>parseFloat(pct(x[1],TOTAL_DRAWS))),backgroundColor:'#f97316',borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9ca3af',font:{size:10}}},y:{ticks:{color:'#9ca3af',font:{size:10}},grid:{color:'#374151'}}}}});
+}
+
+// ---- NAV B ----
+const navBkeys=['rank','trend','history','about'];
+let activeTabB=2;
+function navB(page){
+  showPage('B',page,navBkeys);
+  setNav('B',page,navBkeys);
+}
+function switchTabB(n){
+  activeTabB=n;
+  document.getElementById('list2B').classList.toggle('hidden',n!==2);
+  document.getElementById('list3B').classList.toggle('hidden',n!==3);
+  document.getElementById('tab2B').className=`flex-1 py-1.5 rounded-lg text-sm font-medium ${n===2?'bg-white text-black':'text-gray-400'}`;
+  document.getElementById('tab3B').className=`flex-1 py-1.5 rounded-lg text-sm font-medium ${n===3?'bg-white text-black':'text-gray-400'}`;
+}
+
+// ---- NAV C ----
+const navCkeys=['map','rank','chart','settings'];
+let chartC=null;
+function navC(page){
+  showPage('C',page,navCkeys);
+  setNav('C',page,navCkeys);
+  if(page==='chart') renderChartC();
+}
+function switchTabC(n){
+  document.getElementById('grid2C').classList.toggle('hidden',n!==2);
+  document.getElementById('grid3C').classList.toggle('hidden',n!==3);
+  document.getElementById('tabC2').className=`flex-1 py-1.5 rounded-lg text-sm font-medium ${n===2?'bg-white text-black':'text-gray-400'}`;
+  document.getElementById('tabC3').className=`flex-1 py-1.5 rounded-lg text-sm font-medium ${n===3?'bg-white text-black':'text-gray-400'}`;
+}
+function switchRankC(n){
+  document.getElementById('Crank2list').classList.toggle('hidden',n!==2);
+  document.getElementById('Crank3list').classList.toggle('hidden',n!==3);
+  document.getElementById('Crank2btn').className=`flex-1 py-1.5 rounded-lg text-sm font-medium ${n===2?'bg-white text-black':'bg-gray-700 text-gray-400'}`;
+  document.getElementById('Crank3btn').className=`flex-1 py-1.5 rounded-lg text-sm font-medium ${n===3?'bg-white text-black':'bg-gray-700 text-gray-400'}`;
+}
+function renderChartC(){
+  if(chartC){chartC.destroy();chartC=null;}
+  const top15=sorted2.slice(0,15);
+  const ctx=document.getElementById('barChartC').getContext('2d');
+  chartC=new Chart(ctx,{type:'bar',data:{labels:top15.map(x=>x[0]),datasets:[{data:top15.map(x=>parseFloat(pct(x[1],TOTAL_DRAWS))),backgroundColor:top15.map(x=>heatLevel(x[1],TOTAL_DRAWS)>=4?'#ef4444':'#3b82f6'),borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9ca3af'}},y:{ticks:{color:'#9ca3af'},grid:{color:'#374151'}}}}});
+}
+function showTooltip(num,count,total){
+  document.getElementById('tooltipNum').textContent=num;
+  document.getElementById('tooltipPct').textContent=pct(count,total)+'%';
+  document.getElementById('tooltipCount').textContent=`ออก ${count} ครั้ง จาก ${total} งวด`;
+  const t=document.getElementById('tooltipC');
+  t.classList.remove('hidden');
+  t.addEventListener('click',()=>t.classList.add('hidden'),{once:true});
+}
+
+// ---- RENDER DATA ----
+function renderA(){
+  document.getElementById('cdA').textContent=countdown();
+  document.getElementById('hotCards2A').innerHTML=top2.slice(0,5).map(([n,c])=>`<div class="bg-gray-800 rounded-xl p-2 text-center"><div class="text-xl font-bold">${n}</div><div class="text-xs text-green-400 mt-0.5">${pct(c,TOTAL_DRAWS)}%</div></div>`).join('');
+  document.getElementById('hotCards3A').innerHTML=top3.slice(0,5).map(([n,c])=>`<div class="bg-gray-800 rounded-xl p-2 text-center"><div class="text-lg font-bold">${n}</div><div class="text-xs text-green-400 mt-0.5">${pct(c,TOTAL_DRAWS)}%</div></div>`).join('');
+  document.getElementById('coldCards2A').innerHTML=sorted2.slice(-8).map(([n,c])=>`<div class="bg-gray-800/60 rounded-xl px-3 py-2 text-center"><div class="text-base font-bold text-blue-400">${n}</div><div class="text-xs text-gray-500">${pct(c,TOTAL_DRAWS)}%</div></div>`).join('');
+  const all2=document.getElementById('Aall2list');
+  all2.innerHTML=sorted2.map(([n,c],i)=>`<div class="flex items-center bg-gray-800 rounded-xl px-3 py-2.5 gap-3"><span class="text-gray-500 text-xs w-5">${i+1}</span><span class="text-lg font-bold w-8">${n}</span><div class="flex-1 bg-gray-700 rounded-full h-1.5"><div class="h-1.5 rounded-full ${parseFloat(pct(c,TOTAL_DRAWS))>=1?'bg-red-400':'bg-blue-400'}" style="width:${Math.min(100,(c/TOTAL_DRAWS)*10000)}%"></div></div><span class="text-xs ${parseFloat(pct(c,TOTAL_DRAWS))>=1?'text-green-400':'text-gray-400'} w-12 text-right">${pct(c,TOTAL_DRAWS)}%</span></div>`).join('');
+  const all3=document.getElementById('Aall3list');
+  all3.innerHTML=sorted3.slice(0,50).map(([n,c],i)=>`<div class="flex items-center bg-gray-800 rounded-xl px-3 py-2.5 gap-3"><span class="text-gray-500 text-xs w-5">${i+1}</span><span class="text-lg font-bold w-10">${n}</span><div class="flex-1 bg-gray-700 rounded-full h-1.5"><div class="h-1.5 rounded-full bg-orange-400" style="width:${Math.min(100,(c/TOTAL_DRAWS)*50000)}%"></div></div><span class="text-xs text-green-400 w-12 text-right">${pct(c,TOTAL_DRAWS)}%</span></div>`).join('');
+}
+
+function renderB(){
+  document.getElementById('cdB').textContent=countdown();
+  const medals=['🥇','🥈','🥉'];
+  document.getElementById('rankList2B').innerHTML=sorted2.slice(0,20).map(([n,c],i)=>{
+    const p=parseFloat(pct(c,TOTAL_DRAWS)),diff=p-1.0,bw=Math.min(100,(p/3.0)*100);
+    return`<div class="bg-gray-800 rounded-xl p-3 flex items-center gap-3"><div class="text-lg w-6 text-center">${medals[i]||i+1}</div><div class="text-2xl font-bold w-10">${n}</div><div class="flex-1"><div class="flex justify-between text-xs mb-1"><span class="text-green-400 font-semibold">${p}%</span><span class="${diff>=0?'text-green-500':'text-red-400'} text-xs">${diff>=0?'+':''}${diff.toFixed(2)}% vs ฐาน</span></div><div class="bg-gray-700 rounded-full h-1.5"><div class="bg-gradient-to-r from-yellow-400 to-red-500 h-1.5 rounded-full" style="width:${bw}%"></div></div></div></div>`;
+  }).join('');
+  document.getElementById('rankList3B').innerHTML=sorted3.slice(0,20).map(([n,c],i)=>{
+    const p=parseFloat(pct(c,TOTAL_DRAWS)),diff=p-0.10,bw=Math.min(100,(p/0.5)*100);
+    return`<div class="bg-gray-800 rounded-xl p-3 flex items-center gap-3"><div class="text-lg w-6 text-center">${medals[i]||i+1}</div><div class="text-2xl font-bold w-12">${n}</div><div class="flex-1"><div class="flex justify-between text-xs mb-1"><span class="text-green-400 font-semibold">${p}%</span><span class="${diff>=0?'text-green-500':'text-red-400'} text-xs">${diff>=0?'+':''}${diff.toFixed(2)}% vs ฐาน</span></div><div class="bg-gray-700 rounded-full h-1.5"><div class="bg-gradient-to-r from-yellow-400 to-red-500 h-1.5 rounded-full" style="width:${bw}%"></div></div></div></div>`;
+  }).join('');
+  // Trend
+  document.getElementById('trendListB').innerHTML=sorted2.slice(0,10).map(([n,c])=>{
+    const overall=parseFloat(pct(c,TOTAL_DRAWS));
+    const recent=parseFloat(pct(Math.floor(c*0.55+Math.random()*3),720));
+    const up=recent>=overall;
+    return`<div class="bg-gray-800 rounded-xl p-3 flex items-center gap-3"><div class="text-2xl font-bold w-10">${n}</div><div class="flex-1"><div class="flex justify-between text-xs mb-1"><span class="text-gray-400">ทั้งหมด: ${overall}%</span><span class="${up?'text-green-400':'text-blue-400'}">5ปีล่าสุด: ${recent}% ${up?'↑':'↓'}</span></div><div class="bg-gray-700 rounded-full h-1.5"><div class="bg-gradient-to-r from-blue-400 to-green-400 h-1.5 rounded-full" style="width:${Math.min(100,recent/3*100)}%"></div></div></div></div>`;
+  }).join('');
+  // History
+  const draws=[];
+  for(let i=0;i<12;i++){
+    const d=new Date(2026,4,1);
+    d.setMonth(d.getMonth()-Math.floor(i/2));
+    if(i%2===1)d.setDate(16);
+    draws.push({date:`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`,two:String(Math.floor(Math.random()*100)).padStart(2,'0'),three:String(Math.floor(Math.random()*1000)).padStart(3,'0')});
+  }
+  document.getElementById('historyListB').innerHTML=draws.map(d=>`<div class="bg-gray-800 rounded-xl p-3 flex items-center justify-between"><span class="text-gray-400 text-sm">${d.date}</span><div class="flex gap-3"><span class="bg-yellow-500 text-black font-bold px-2 py-0.5 rounded-lg text-sm">${d.two}</span><span class="bg-orange-500 text-white font-bold px-2 py-0.5 rounded-lg text-sm">${d.three}</span></div></div>`).join('');
+}
+
+function renderC(){
+  const grid2=document.getElementById('heatGrid2');
+  grid2.innerHTML='';
+  for(let i=0;i<=99;i++){
+    const k=String(i).padStart(2,'0'),c=mock2[k];
+    const h=heatLevel(c,TOTAL_DRAWS);
+    const cell=document.createElement('div');
+    cell.className=`heat-${h} rounded text-center py-2 text-xs font-bold cursor-pointer select-none`;
+    cell.textContent=k;
+    cell.onclick=()=>showTooltip(k,c,TOTAL_DRAWS);
+    grid2.appendChild(cell);
+  }
+  const grid3=document.getElementById('heatGrid3');
+  grid3.innerHTML='';
+  sorted3.slice(0,100).forEach(([k,c])=>{
+    const h=heatLevel(c,TOTAL_DRAWS);
+    const cell=document.createElement('div');
+    cell.className=`heat-${h} rounded text-center py-2 text-xs font-bold cursor-pointer select-none`;
+    cell.textContent=k;
+    cell.onclick=()=>showTooltip(k,c,TOTAL_DRAWS);
+    grid3.appendChild(cell);
+  });
+  // Rank C
+  document.getElementById('Crank2list').innerHTML=sorted2.slice(0,20).map(([n,c],i)=>`<div class="flex items-center bg-gray-800 rounded-xl px-3 py-2.5 gap-3"><span class="text-gray-500 text-xs w-5">${i+1}</span><span class="text-lg font-bold w-8">${n}</span><div class="flex-1 bg-gray-700 rounded-full h-1.5"><div class="h-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-red-500" style="width:${Math.min(100,(parseFloat(pct(c,TOTAL_DRAWS))/3)*100)}%"></div></div><span class="text-xs text-green-400 w-12 text-right">${pct(c,TOTAL_DRAWS)}%</span></div>`).join('');
+  document.getElementById('Crank3list').innerHTML=sorted3.slice(0,20).map(([n,c],i)=>`<div class="flex items-center bg-gray-800 rounded-xl px-3 py-2.5 gap-3"><span class="text-gray-500 text-xs w-5">${i+1}</span><span class="text-lg font-bold w-12">${n}</span><div class="flex-1 bg-gray-700 rounded-full h-1.5"><div class="h-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500" style="width:${Math.min(100,(parseFloat(pct(c,TOTAL_DRAWS))/0.5)*100)}%"></div></div><span class="text-xs text-green-400 w-12 text-right">${pct(c,TOTAL_DRAWS)}%</span></div>`).join('');
+}
+
+// ---- VARIANT SWITCHER ----
+const variants=[
+  {id:'varA',label:'A — Featured Cards'},
+  {id:'varB',label:'B — Leaderboard'},
+  {id:'varC',label:'C — Heatmap Grid'},
+];
+let currentVariant=0;
+function getVariantFromURL(){
+  const p=new URLSearchParams(window.location.search).get('variant');
+  if(p==='B')return 1;if(p==='C')return 2;return 0;
+}
+function showVariant(idx){
+  currentVariant=((idx%variants.length)+variants.length)%variants.length;
+  variants.forEach((v,i)=>{
+    const el=document.getElementById(v.id);
+    el.classList.toggle('hidden',i!==currentVariant);
+  });
+  document.getElementById('varLabel').textContent=variants[currentVariant].label;
+  const key=['A','B','C'][currentVariant];
+  const url=new URL(window.location);
+  url.searchParams.set('variant',key);
+  history.replaceState({},'',url);
+}
+function prevVariant(){showVariant(currentVariant-1);}
+function nextVariant(){showVariant(currentVariant+1);}
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName))return;
+  if(e.key==='ArrowLeft')prevVariant();
+  if(e.key==='ArrowRight')nextVariant();
+});
+
+// ---- INIT ----
+renderA(); renderB(); renderC();
+showVariant(getVariantFromURL());
+</script>
+</body>
+</html>

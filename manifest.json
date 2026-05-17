@@ -1,0 +1,10 @@
+{
+  "name": "LottoStat TH",
+  "short_name": "LottoStat",
+  "description": "Thai lottery statistics — 24 years of historical data",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait"
+}
