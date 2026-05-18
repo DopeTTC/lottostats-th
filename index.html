@@ -59,8 +59,9 @@
 <script>
 // ── Global state (populated by loadData) ──
 let TOTAL_DRAWS = 0;
-let sorted2 = [];   // [[num_str, count], ...] sorted desc
-let sorted3 = [];
+let sorted2   = [];   // two_down (2ตัวล่าง)
+let sorted2up = [];   // two_up (2ตัวบน)
+let sorted3   = [];   // three_up (3ตัวบน)
 let draws   = [];   // raw draw history array
 let meta    = {};
 
@@ -101,11 +102,15 @@ async function loadData(){
     TOTAL_DRAWS  = meta.total_draws;
 
     // Build sorted arrays [[key, count], ...]
-    sorted2 = Object.entries(json.stats.two_digit)
+    sorted2 = Object.entries(json.stats.two_down)
       .map(([k,v])=>[k, v.count])
       .sort((a,b)=>b[1]-a[1]);
 
-    sorted3 = Object.entries(json.stats.three_digit)
+    sorted2up = Object.entries(json.stats.two_up)
+      .map(([k,v])=>[k, v.count])
+      .sort((a,b)=>b[1]-a[1]);
+
+    sorted3 = Object.entries(json.stats.three_up)
       .map(([k,v])=>[k, v.count])
       .sort((a,b)=>b[1]-a[1]);
 
@@ -142,28 +147,37 @@ async function loadData(){
     </div>
   </div>
 
-  <!-- Hot 2-digit -->
+  <!-- Hot 3ตัวบน -->
   <div class="px-5 mb-6">
     <div class="flex justify-between items-center mb-3">
-      <h2 class="font-bold text-base">🔥 เลขท้าย 2 ตัว ร้อนแรง</h2>
-      <span class="text-xs text-gray-500">ฐาน 1.00%</span>
-    </div>
-    <div class="grid grid-cols-5 gap-2" id="hot2Home"></div>
-  </div>
-
-  <!-- Hot 3-digit -->
-  <div class="px-5 mb-6">
-    <div class="flex justify-between items-center mb-3">
-      <h2 class="font-bold text-base">🔥 เลขท้าย 3 ตัว ร้อนแรง</h2>
+      <h2 class="font-bold text-base">🔥 3 ตัวบน ร้อนแรง</h2>
       <span class="text-xs text-gray-500">ฐาน 0.10%</span>
     </div>
     <div class="grid grid-cols-5 gap-2" id="hot3Home"></div>
   </div>
 
-  <!-- Cold 2-digit -->
+  <!-- Hot 2ตัวบน -->
   <div class="px-5 mb-6">
     <div class="flex justify-between items-center mb-3">
-      <h2 class="font-bold text-base">❄️ เลขท้าย 2 ตัว เย็นชา</h2>
+      <h2 class="font-bold text-base">🔥 2 ตัวบน ร้อนแรง</h2>
+      <span class="text-xs text-gray-500">ฐาน 1.00%</span>
+    </div>
+    <div class="grid grid-cols-5 gap-2" id="hot2upHome"></div>
+  </div>
+
+  <!-- Hot 2ตัวล่าง -->
+  <div class="px-5 mb-6">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-bold text-base">🔥 2 ตัวล่าง ร้อนแรง</h2>
+      <span class="text-xs text-gray-500">ฐาน 1.00%</span>
+    </div>
+    <div class="grid grid-cols-5 gap-2" id="hot2Home"></div>
+  </div>
+
+  <!-- Cold 2ตัวล่าง -->
+  <div class="px-5 mb-6">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-bold text-base">❄️ 2 ตัวล่าง เย็นชา</h2>
       <span class="text-xs text-gray-500">ไม่ออกนาน</span>
     </div>
     <div class="flex flex-wrap gap-2" id="cold2Home"></div>
@@ -175,8 +189,9 @@ async function loadData(){
     <div class="bg-gray-800 rounded-2xl p-4 flex items-center justify-between">
       <div class="text-sm text-gray-400" id="lastDrawDate"></div>
       <div class="flex gap-3">
-        <div class="text-center"><div class="text-xs text-gray-500 mb-1">2 ตัว</div><div class="bg-yellow-500 text-black font-black text-xl px-3 py-1 rounded-xl" id="lastTwo"></div></div>
-        <div class="text-center"><div class="text-xs text-gray-500 mb-1">3 ตัว</div><div class="bg-orange-500 text-white font-black text-xl px-3 py-1 rounded-xl" id="lastThree"></div></div>
+        <div class="text-center"><div class="text-xs text-gray-500 mb-1">3 ตัวบน</div><div class="bg-orange-500 text-white font-black text-xl px-3 py-1 rounded-xl" id="lastThree"></div></div>
+        <div class="text-center"><div class="text-xs text-gray-500 mb-1">2 ตัวบน</div><div class="bg-green-500 text-black font-black text-xl px-3 py-1 rounded-xl" id="lastTwoUp"></div></div>
+        <div class="text-center"><div class="text-xs text-gray-500 mb-1">2 ตัวล่าง</div><div class="bg-yellow-500 text-black font-black text-xl px-3 py-1 rounded-xl" id="lastTwo"></div></div>
       </div>
     </div>
   </div>
@@ -212,19 +227,25 @@ async function loadData(){
 
   <!-- Tabs -->
   <div class="flex mx-5 mb-4 bg-gray-800 rounded-xl p-1 gap-1">
-    <button id="mapTab2" onclick="switchMapTab(2)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">เลข 2 ตัว</button>
-    <button id="mapTab3" onclick="switchMapTab(3)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">เลข 3 ตัว (Top 100)</button>
+    <button id="mapTab3" onclick="switchMapTab('3')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">3 ตัวบน</button>
+    <button id="mapTab2u" onclick="switchMapTab('2u')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">2 ตัวบน</button>
+    <button id="mapTab2d" onclick="switchMapTab('2d')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">2 ตัวล่าง</button>
   </div>
 
-  <!-- Grid 2 -->
-  <div id="mapGrid2" class="px-4">
-    <div class="grid grid-cols-10 gap-1.5" id="heatGrid2"></div>
-  </div>
-
-  <!-- Grid 3 -->
-  <div id="mapGrid3" class="px-4 hidden">
+  <!-- Grid 3ตัวบน -->
+  <div id="mapGrid3" class="px-4">
     <div class="text-xs text-gray-600 mb-2 text-center">แสดง Top 100 เรียงตามความถี่</div>
     <div class="grid grid-cols-10 gap-1.5" id="heatGrid3"></div>
+  </div>
+
+  <!-- Grid 2ตัวบน -->
+  <div id="mapGrid2u" class="px-4 hidden">
+    <div class="grid grid-cols-10 gap-1.5" id="heatGrid2u"></div>
+  </div>
+
+  <!-- Grid 2ตัวล่าง -->
+  <div id="mapGrid2d" class="px-4 hidden">
+    <div class="grid grid-cols-10 gap-1.5" id="heatGrid2d"></div>
   </div>
 
   <!-- Tooltip overlay -->
@@ -245,13 +266,15 @@ async function loadData(){
   <div class="px-5 pt-2 pb-3 sticky top-0 bg-gray-950 z-10 border-b border-gray-800/60">
     <h1 class="text-2xl font-black mb-3">อันดับ 🏆</h1>
     <div class="flex bg-gray-800 rounded-xl p-1 gap-1">
-      <button id="rankTab2" onclick="switchRankTab(2)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">เลข 2 ตัว</button>
-      <button id="rankTab3" onclick="switchRankTab(3)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">เลข 3 ตัว</button>
+      <button id="rankTab3" onclick="switchRankTab('3')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">3 ตัวบน</button>
+      <button id="rankTab2u" onclick="switchRankTab('2u')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">2 ตัวบน</button>
+      <button id="rankTab2d" onclick="switchRankTab('2d')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">2 ตัวล่าง</button>
     </div>
   </div>
 
-  <div id="rankList2" class="px-4 pt-3 space-y-2 pb-4"></div>
-  <div id="rankList3" class="px-4 pt-3 space-y-2 pb-4 hidden"></div>
+  <div id="rankList3" class="px-4 pt-3 space-y-2 pb-4"></div>
+  <div id="rankList2u" class="px-4 pt-3 space-y-2 pb-4 hidden"></div>
+  <div id="rankList2d" class="px-4 pt-3 space-y-2 pb-4 hidden"></div>
 </div>
 
 <!-- ── PAGE: CHART ── -->
@@ -264,25 +287,35 @@ async function loadData(){
 
   <!-- Sub-tabs -->
   <div class="flex mx-5 mb-4 bg-gray-800 rounded-xl p-1 gap-1">
-    <button id="chartTab2" onclick="switchChartTab(2)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">2 ตัว Top 20</button>
-    <button id="chartTab3" onclick="switchChartTab(3)" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">3 ตัว Top 15</button>
+    <button id="chartTab3" onclick="switchChartTab('3')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold bg-white text-black transition-all">3 ตัวบน</button>
+    <button id="chartTab2u" onclick="switchChartTab('2u')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">2 ตัวบน</button>
+    <button id="chartTab2d" onclick="switchChartTab('2d')" class="flex-1 py-1.5 rounded-lg text-sm font-semibold text-gray-400 transition-all">2 ตัวล่าง</button>
   </div>
 
-  <div id="chartView2" class="px-4">
-    <div class="bg-gray-900 rounded-2xl p-4"><canvas id="chartCanvas2" height="280"></canvas></div>
-    <div class="mt-3 bg-gray-900 rounded-2xl p-3 flex justify-around text-center">
-      <div><div class="text-lg font-bold text-green-400" id="statAvg2"></div><div class="text-xs text-gray-500">ค่าเฉลี่ย</div></div>
-      <div><div class="text-lg font-bold text-red-400" id="statMax2"></div><div class="text-xs text-gray-500">สูงสุด</div></div>
-      <div><div class="text-lg font-bold text-blue-400" id="statMin2"></div><div class="text-xs text-gray-500">ต่ำสุด</div></div>
-    </div>
-  </div>
-
-  <div id="chartView3" class="px-4 hidden">
+  <div id="chartView3" class="px-4">
     <div class="bg-gray-900 rounded-2xl p-4"><canvas id="chartCanvas3" height="280"></canvas></div>
     <div class="mt-3 bg-gray-900 rounded-2xl p-3 flex justify-around text-center">
       <div><div class="text-lg font-bold text-green-400" id="statAvg3"></div><div class="text-xs text-gray-500">ค่าเฉลี่ย</div></div>
       <div><div class="text-lg font-bold text-red-400" id="statMax3"></div><div class="text-xs text-gray-500">สูงสุด</div></div>
       <div><div class="text-lg font-bold text-blue-400" id="statMin3"></div><div class="text-xs text-gray-500">ต่ำสุด</div></div>
+    </div>
+  </div>
+
+  <div id="chartView2u" class="px-4 hidden">
+    <div class="bg-gray-900 rounded-2xl p-4"><canvas id="chartCanvas2u" height="280"></canvas></div>
+    <div class="mt-3 bg-gray-900 rounded-2xl p-3 flex justify-around text-center">
+      <div><div class="text-lg font-bold text-green-400" id="statAvg2u"></div><div class="text-xs text-gray-500">ค่าเฉลี่ย</div></div>
+      <div><div class="text-lg font-bold text-red-400" id="statMax2u"></div><div class="text-xs text-gray-500">สูงสุด</div></div>
+      <div><div class="text-lg font-bold text-blue-400" id="statMin2u"></div><div class="text-xs text-gray-500">ต่ำสุด</div></div>
+    </div>
+  </div>
+
+  <div id="chartView2d" class="px-4 hidden">
+    <div class="bg-gray-900 rounded-2xl p-4"><canvas id="chartCanvas2d" height="280"></canvas></div>
+    <div class="mt-3 bg-gray-900 rounded-2xl p-3 flex justify-around text-center">
+      <div><div class="text-lg font-bold text-green-400" id="statAvg2d"></div><div class="text-xs text-gray-500">ค่าเฉลี่ย</div></div>
+      <div><div class="text-lg font-bold text-red-400" id="statMax2d"></div><div class="text-xs text-gray-500">สูงสุด</div></div>
+      <div><div class="text-lg font-bold text-blue-400" id="statMin2d"></div><div class="text-xs text-gray-500">ต่ำสุด</div></div>
     </div>
   </div>
 </div>
@@ -310,7 +343,7 @@ async function loadData(){
 ====================================================== -->
 <script>
 const PAGES = ['home','map','rank','chart'];
-let chart2 = null, chart3 = null;
+let chart2 = null, chart2u = null, chart3 = null;
 
 // ---- Navigation ----
 function goTo(page) {
@@ -351,6 +384,13 @@ function renderHome() {
       <div class="text-xs text-gray-600 mt-0.5">${c} ครั้ง</div>
     </div>`).join('');
 
+  document.getElementById('hot2upHome').innerHTML = sorted2up.slice(0,5).map(([n,c]) =>
+    `<div class="bg-gray-800 rounded-xl p-2 text-center cursor-default">
+      <div class="text-2xl font-black">${n}</div>
+      <div class="text-xs text-green-400 font-semibold mt-0.5">${pct(c,TOTAL_DRAWS)}%</div>
+      <div class="text-xs text-gray-600 mt-0.5">${c} ครั้ง</div>
+    </div>`).join('');
+
   document.getElementById('cold2Home').innerHTML = sorted2.slice(-6).reverse().map(([n,c]) =>
     `<div class="bg-gray-800/70 rounded-xl px-3 py-2 text-center cursor-default">
       <div class="text-base font-black text-blue-400">${n}</div>
@@ -360,8 +400,9 @@ function renderHome() {
   // Real last draw
   const last = draws[draws.length - 1];
   document.getElementById('lastDrawDate').textContent = `งวด ${fmtDate(last.date)}`;
-  document.getElementById('lastTwo').textContent  = last.last2  || '--';
-  document.getElementById('lastThree').textContent = last.last3 || '--';
+  document.getElementById('lastTwo').textContent    = last.two_down  || '--';
+  document.getElementById('lastTwoUp').textContent  = last.two_up    || '--';
+  document.getElementById('lastThree').textContent  = last.three_up  || '--';
 }
 
 // ---- MAP ----
@@ -370,24 +411,32 @@ function renderMap() {
   if (mapRendered) return;
   mapRendered = true;
 
-  // Build lookup map for O(1) access
-  const map2 = Object.fromEntries(sorted2);
-  const grid2 = document.getElementById('heatGrid2');
+  const map2d = Object.fromEntries(sorted2);
+  const grid2d = document.getElementById('heatGrid2d');
   for (let i = 0; i <= 99; i++) {
-    const k = String(i).padStart(2,'0'), c = map2[k] || 0;
-    const h = heatLevel(c, TOTAL_DRAWS);
+    const k = String(i).padStart(2,'0'), c = map2d[k] || 0;
     const el = document.createElement('div');
-    el.className = `h${h} rounded text-center py-2.5 text-xs font-bold cursor-pointer active:opacity-70`;
+    el.className = `h${heatLevel(c,TOTAL_DRAWS)} rounded text-center py-2.5 text-xs font-bold cursor-pointer active:opacity-70`;
     el.textContent = k;
     el.onclick = () => showMapTooltip(k, c, TOTAL_DRAWS, 1.0);
-    grid2.appendChild(el);
+    grid2d.appendChild(el);
+  }
+
+  const map2u = Object.fromEntries(sorted2up);
+  const grid2u = document.getElementById('heatGrid2u');
+  for (let i = 0; i <= 99; i++) {
+    const k = String(i).padStart(2,'0'), c = map2u[k] || 0;
+    const el = document.createElement('div');
+    el.className = `h${heatLevel(c,TOTAL_DRAWS)} rounded text-center py-2.5 text-xs font-bold cursor-pointer active:opacity-70`;
+    el.textContent = k;
+    el.onclick = () => showMapTooltip(k, c, TOTAL_DRAWS, 1.0);
+    grid2u.appendChild(el);
   }
 
   const grid3 = document.getElementById('heatGrid3');
   sorted3.slice(0,100).forEach(([k,c]) => {
-    const h = heatLevel(c, TOTAL_DRAWS);
     const el = document.createElement('div');
-    el.className = `h${h} rounded text-center py-2.5 text-xs font-bold cursor-pointer active:opacity-70`;
+    el.className = `h${heatLevel(c,TOTAL_DRAWS)} rounded text-center py-2.5 text-xs font-bold cursor-pointer active:opacity-70`;
     el.textContent = k;
     el.onclick = () => showMapTooltip(k, c, TOTAL_DRAWS, 0.10);
     grid3.appendChild(el);
@@ -395,10 +444,10 @@ function renderMap() {
 }
 
 function switchMapTab(n) {
-  document.getElementById('mapGrid2').classList.toggle('hidden', n !== 2);
-  document.getElementById('mapGrid3').classList.toggle('hidden', n !== 3);
-  document.getElementById('mapTab2').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===2?'bg-white text-black':'text-gray-400'}`;
-  document.getElementById('mapTab3').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===3?'bg-white text-black':'text-gray-400'}`;
+  ['2d','2u','3'].forEach(t => {
+    document.getElementById(`mapGrid${t}`).classList.toggle('hidden', t !== n);
+    document.getElementById(`mapTab${t}`).className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${t===n?'bg-white text-black':'text-gray-400'}`;
+  });
 }
 
 function showMapTooltip(num, count, total, base) {
@@ -420,25 +469,8 @@ function renderRank() {
   rankRendered = true;
   const medals = ['🥇','🥈','🥉'];
 
-  document.getElementById('rankList2').innerHTML = sorted2.slice(0,30).map(([n,c],i) => {
-    const p = parseFloat(pct(c,TOTAL_DRAWS)), diff = (p-1.0).toFixed(2), bw = Math.min(100,(p/3)*100);
-    return `<div class="bg-gray-800 rounded-2xl p-3 flex items-center gap-3">
-      <div class="text-base w-7 text-center shrink-0">${medals[i] || `<span class="text-gray-500 text-sm">${i+1}</span>`}</div>
-      <div class="text-2xl font-black w-10 shrink-0">${n}</div>
-      <div class="flex-1 min-w-0">
-        <div class="flex justify-between text-xs mb-1.5">
-          <span class="font-bold text-green-400">${p}%</span>
-          <span class="${parseFloat(diff)>=0?'text-green-500':'text-blue-400'} font-medium">${parseFloat(diff)>=0?'+':''}${diff}% vs ฐาน</span>
-        </div>
-        <div class="bg-gray-700 rounded-full h-1.5">
-          <div class="h-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-red-500 transition-all" style="width:${bw}%"></div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('rankList3').innerHTML = sorted3.slice(0,30).map(([n,c],i) => {
-    const p = parseFloat(pct(c,TOTAL_DRAWS)), diff = (p-0.10).toFixed(3), bw = Math.min(100,(p/0.6)*100);
+  const rankRow2 = (n,c,i,base,bwMax,grad) => {
+    const p = parseFloat(pct(c,TOTAL_DRAWS)), diff = (p-base).toFixed(base<1?3:2), bw = Math.min(100,(p/bwMax)*100);
     return `<div class="bg-gray-800 rounded-2xl p-3 flex items-center gap-3">
       <div class="text-base w-7 text-center shrink-0">${medals[i] || `<span class="text-gray-500 text-sm">${i+1}</span>`}</div>
       <div class="text-2xl font-black w-12 shrink-0">${n}</div>
@@ -448,18 +480,22 @@ function renderRank() {
           <span class="${parseFloat(diff)>=0?'text-green-500':'text-blue-400'} font-medium">${parseFloat(diff)>=0?'+':''}${diff}% vs ฐาน</span>
         </div>
         <div class="bg-gray-700 rounded-full h-1.5">
-          <div class="h-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all" style="width:${bw}%"></div>
+          <div class="h-1.5 rounded-full bg-gradient-to-r ${grad} transition-all" style="width:${bw}%"></div>
         </div>
       </div>
     </div>`;
-  }).join('');
+  };
+
+  document.getElementById('rankList2d').innerHTML = sorted2.slice(0,30).map((([n,c],i) => rankRow2(n,c,i,1.0,3,'from-yellow-400 to-red-500'))).join('');
+  document.getElementById('rankList2u').innerHTML = sorted2up.slice(0,30).map((([n,c],i) => rankRow2(n,c,i,1.0,3,'from-green-400 to-teal-500'))).join('');
+  document.getElementById('rankList3').innerHTML  = sorted3.slice(0,30).map((([n,c],i) => rankRow2(n,c,i,0.10,0.6,'from-yellow-400 to-orange-500'))).join('');
 }
 
 function switchRankTab(n) {
-  document.getElementById('rankList2').classList.toggle('hidden', n !== 2);
-  document.getElementById('rankList3').classList.toggle('hidden', n !== 3);
-  document.getElementById('rankTab2').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===2?'bg-white text-black':'text-gray-400'}`;
-  document.getElementById('rankTab3').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===3?'bg-white text-black':'text-gray-400'}`;
+  ['2d','2u','3'].forEach(t => {
+    document.getElementById(`rankList${t}`).classList.toggle('hidden', t !== n);
+    document.getElementById(`rankTab${t}`).className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${t===n?'bg-white text-black':'text-gray-400'}`;
+  });
 }
 
 // ---- CHARTS ----
@@ -468,69 +504,59 @@ function renderCharts() {
   if (chartsRendered) return;
   chartsRendered = true;
 
-  const top20 = sorted2.slice(0,20);
-  const vals2 = top20.map(x => parseFloat(pct(x[1],TOTAL_DRAWS)));
-  chart2 = new Chart(document.getElementById('chartCanvas2').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: top20.map(x=>x[0]),
-      datasets: [{
-        data: vals2,
-        backgroundColor: vals2.map(v => v >= 2.0 ? '#b91c1c' : v >= 1.6 ? '#ef4444' : v >= 1.3 ? '#f97316' : '#3b82f6'),
-        borderRadius: 5,
-      }]
-    },
-    options: {
-      plugins: { legend: { display:false }, tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y}%` } } },
-      scales: {
-        x: { ticks: { color:'#9ca3af', font:{size:11} }, grid: { display:false } },
-        y: { ticks: { color:'#9ca3af', font:{size:10}, callback: v=>v+'%' }, grid: { color:'#1f2937' } }
+  const makeChart = (canvasId, data, color, dec) => {
+    const vals = data.map(x => parseFloat(pct(x[1],TOTAL_DRAWS)));
+    const colors = Array.isArray(color)
+      ? vals.map(v => v >= 2.0 ? color[0] : v >= 1.6 ? color[1] : v >= 1.3 ? color[2] : color[3])
+      : color;
+    return { chart: new Chart(document.getElementById(canvasId).getContext('2d'), {
+      type: 'bar',
+      data: { labels: data.map(x=>x[0]), datasets: [{ data: vals, backgroundColor: colors, borderRadius: 5 }] },
+      options: {
+        plugins: { legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.y}%`}} },
+        scales: {
+          x: { ticks:{color:'#9ca3af',font:{size:11}}, grid:{display:false} },
+          y: { ticks:{color:'#9ca3af',font:{size:10},callback:v=>v+'%'}, grid:{color:'#1f2937'} }
+        }
       }
-    }
-  });
-  document.getElementById('statAvg2').textContent = (vals2.reduce((a,b)=>a+b,0)/vals2.length).toFixed(2)+'%';
-  document.getElementById('statMax2').textContent = Math.max(...vals2).toFixed(2)+'%';
-  document.getElementById('statMin2').textContent = Math.min(...vals2).toFixed(2)+'%';
+    }), vals };
+  };
 
-  const top15 = sorted3.slice(0,15);
-  const vals3 = top15.map(x => parseFloat(pct(x[1],TOTAL_DRAWS)));
-  chart3 = new Chart(document.getElementById('chartCanvas3').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: top15.map(x=>x[0]),
-      datasets: [{
-        data: vals3,
-        backgroundColor: '#f97316',
-        borderRadius: 5,
-      }]
-    },
-    options: {
-      plugins: { legend: { display:false }, tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y}%` } } },
-      scales: {
-        x: { ticks: { color:'#9ca3af', font:{size:10} }, grid: { display:false } },
-        y: { ticks: { color:'#9ca3af', font:{size:10}, callback: v=>v+'%' }, grid: { color:'#1f2937' } }
-      }
-    }
-  });
-  document.getElementById('statAvg3').textContent = (vals3.reduce((a,b)=>a+b,0)/vals3.length).toFixed(3)+'%';
-  document.getElementById('statMax3').textContent = Math.max(...vals3).toFixed(3)+'%';
-  document.getElementById('statMin3').textContent = Math.min(...vals3).toFixed(3)+'%';
+  const r2d = makeChart('chartCanvas2d', sorted2.slice(0,20), ['#b91c1c','#ef4444','#f97316','#3b82f6'], 2);
+  chart2 = r2d.chart;
+  document.getElementById('statAvg2d').textContent = (r2d.vals.reduce((a,b)=>a+b,0)/r2d.vals.length).toFixed(2)+'%';
+  document.getElementById('statMax2d').textContent = Math.max(...r2d.vals).toFixed(2)+'%';
+  document.getElementById('statMin2d').textContent = Math.min(...r2d.vals).toFixed(2)+'%';
+
+  const r2u = makeChart('chartCanvas2u', sorted2up.slice(0,20), ['#059669','#10b981','#34d399','#3b82f6'], 2);
+  chart2u = r2u.chart;
+  document.getElementById('statAvg2u').textContent = (r2u.vals.reduce((a,b)=>a+b,0)/r2u.vals.length).toFixed(2)+'%';
+  document.getElementById('statMax2u').textContent = Math.max(...r2u.vals).toFixed(2)+'%';
+  document.getElementById('statMin2u').textContent = Math.min(...r2u.vals).toFixed(2)+'%';
+
+  const r3 = makeChart('chartCanvas3', sorted3.slice(0,15), '#f97316', 3);
+  chart3 = r3.chart;
+  document.getElementById('statAvg3').textContent = (r3.vals.reduce((a,b)=>a+b,0)/r3.vals.length).toFixed(3)+'%';
+  document.getElementById('statMax3').textContent = Math.max(...r3.vals).toFixed(3)+'%';
+  document.getElementById('statMin3').textContent = Math.min(...r3.vals).toFixed(3)+'%';
 }
 
 function switchChartTab(n) {
-  document.getElementById('chartView2').classList.toggle('hidden', n !== 2);
-  document.getElementById('chartView3').classList.toggle('hidden', n !== 3);
-  document.getElementById('chartTab2').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===2?'bg-white text-black':'text-gray-400'}`;
-  document.getElementById('chartTab3').className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${n===3?'bg-white text-black':'text-gray-400'}`;
+  ['2d','2u','3'].forEach(t => {
+    document.getElementById(`chartView${t}`).classList.toggle('hidden', t !== n);
+    document.getElementById(`chartTab${t}`).className = `flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${t===n?'bg-white text-black':'text-gray-400'}`;
+  });
 }
 
 // ---- REFRESH ----
 async function refreshData() {
   // Reset lazy-render flags
   mapRendered = rankRendered = chartsRendered = false;
-  if (chart2) { chart2.destroy(); chart2 = null; }
-  if (chart3) { chart3.destroy(); chart3 = null; }
-  document.getElementById('heatGrid2').innerHTML = '';
+  if (chart2)  { chart2.destroy();  chart2  = null; }
+  if (chart2u) { chart2u.destroy(); chart2u = null; }
+  if (chart3)  { chart3.destroy();  chart3  = null; }
+  document.getElementById('heatGrid2d').innerHTML = '';
+  document.getElementById('heatGrid2u').innerHTML = '';
   document.getElementById('heatGrid3').innerHTML = '';
   await loadData();
   // Re-render current active page

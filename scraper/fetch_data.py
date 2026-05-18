@@ -87,21 +87,24 @@ def _parse_antdpu_row(row) -> Optional[dict]:
     # num may be 6-digit 1st prize or 2-digit last prize
     if re.match(r"^\d{6}$", num):
         first_prize = num
-        last3 = num[-3:]
-        last2 = num[-2:]
+        three_up = num[-3:]
+        two_up = num[-2:]
+        two_down = num[-2:]
     elif re.match(r"^\d{2}$", num):
-        # Only last2 available
+        # Only two_down available
         first_prize = None
-        last3 = None
-        last2 = num
+        three_up = None
+        two_up = None
+        two_down = num
     else:
         return None
 
     return {
         "date": draw_date,
         "first_prize": first_prize,
-        "last3": last3,
-        "last2": last2,
+        "three_up": three_up,
+        "two_up": two_up,
+        "two_down": two_down,
     }
 
 
@@ -166,8 +169,9 @@ def _parse_vicha_file(draw_date: str, content: str) -> Optional[dict]:
     return {
         "date": draw_date,
         "first_prize": first_prize,
-        "last3": first_prize[-3:],   # last 3 digits of 1st prize
-        "last2": last2,              # independently drawn 2-digit prize
+        "three_up": first_prize[-3:],
+        "two_up": first_prize[-2:],
+        "two_down": last2,
     }
 
 
@@ -186,23 +190,25 @@ def _parse_vicha_item(item: dict) -> Optional[dict]:
             first_prize = str(val).strip()
             break
 
-    last2 = None
-    for key in ["last2", "Last2", "เลขท้าย2ตัว", "tail2"]:
+    two_down = None
+    for key in ["two_down", "last2", "Last2", "เลขท้าย2ตัว", "tail2"]:
         val = item.get(key)
         if val:
             v = str(val).strip().zfill(2)
             if re.match(r"^\d{2}$", v):
-                last2 = v
+                two_down = v
                 break
 
     if not first_prize:
         return None
 
-    last3 = first_prize[-3:]
-    if not last2:
-        last2 = first_prize[-2:]
-
-    return {"date": draw_date, "first_prize": first_prize, "last3": last3, "last2": last2}
+    return {
+        "date": draw_date,
+        "first_prize": first_prize,
+        "three_up": first_prize[-3:],
+        "two_up": first_prize[-2:],
+        "two_down": two_down,
+    }
 
 
 def fetch_glo_latest() -> List[dict]:
@@ -246,13 +252,16 @@ def fetch_glo_latest() -> List[dict]:
                     break
 
         if first_prize:
-            last3 = first_prize[-3:]
-            if not last2:
-                last2 = first_prize[-2:]
             if not draw_date:
                 draw_date = date.today().isoformat()
             print(f"  glo.or.th: {draw_date} → {first_prize}")
-            return [{"date": draw_date, "first_prize": first_prize, "last3": last3, "last2": last2}]
+            return [{
+                "date": draw_date,
+                "first_prize": first_prize,
+                "three_up": first_prize[-3:],
+                "two_up": first_prize[-2:],
+                "two_down": last2,
+            }]
 
         print("  glo.or.th: could not parse result")
         return []
@@ -338,16 +347,20 @@ def merge_draws(sources: List[List[dict]]) -> List[dict]:
 
 def calculate_stats(draws: List[dict]) -> dict:
     total = len(draws)
-    two_digit: Dict[str, int] = {}
-    three_digit: Dict[str, int] = {}
+    three_up: Dict[str, int] = {}
+    two_up: Dict[str, int] = {}
+    two_down: Dict[str, int] = {}
 
     for draw in draws:
-        l2 = draw.get("last2")
-        l3 = draw.get("last3")
-        if l2:
-            two_digit[l2] = two_digit.get(l2, 0) + 1
-        if l3:
-            three_digit[l3] = three_digit.get(l3, 0) + 1
+        t3 = draw.get("three_up")
+        t2u = draw.get("two_up")
+        t2d = draw.get("two_down")
+        if t3:
+            three_up[t3] = three_up.get(t3, 0) + 1
+        if t2u:
+            two_up[t2u] = two_up.get(t2u, 0) + 1
+        if t2d:
+            two_down[t2d] = two_down.get(t2d, 0) + 1
 
     def build_stat(counts: dict[str, int]) -> dict:
         return {
@@ -356,8 +369,9 @@ def calculate_stats(draws: List[dict]) -> dict:
         }
 
     return {
-        "two_digit": build_stat(two_digit),
-        "three_digit": build_stat(three_digit),
+        "three_up": build_stat(three_up),
+        "two_up": build_stat(two_up),
+        "two_down": build_stat(two_down),
     }
 
 
@@ -406,8 +420,9 @@ def main():
     print(f"\nWrote {OUT_FILE}")
     print(f"Total draws: {len(draws)}")
     print(f"Range: {output['meta']['data_from']} → {output['meta']['data_to']}")
-    print(f"2-digit entries: {len(stats['two_digit'])}")
-    print(f"3-digit entries: {len(stats['three_digit'])}")
+    print(f"three_up entries: {len(stats['three_up'])}")
+    print(f"two_up entries: {len(stats['two_up'])}")
+    print(f"two_down entries: {len(stats['two_down'])}")
 
 
 if __name__ == "__main__":
